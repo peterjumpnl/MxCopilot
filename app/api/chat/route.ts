@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import { Configuration, OpenAIApi } from 'openai'
 import prisma from '@/app/lib/prisma'
-import { analyzeIntent, executeActions } from '@/app/services/intentService'
+import { IntentService } from '@/app/services/intentService'
+
+const intentService = new IntentService()
 
 export async function POST(request: Request) {
   try {
-    // Get OpenAI key from database
+    const { message, model, projectId } = await request.json()
+
+    // Get API key
     const apiKeys = await prisma.apiKeys.findFirst({
       orderBy: {
         createdAt: 'desc'
@@ -14,51 +18,68 @@ export async function POST(request: Request) {
 
     if (!apiKeys?.openaiKey) {
       return NextResponse.json(
-        { error: 'OpenAI API key not found in database' },
+        { error: 'OpenAI API key not found' },
         { status: 401 }
       )
     }
 
-    const openai = new OpenAI({
+    // Get project context
+    const project = await prisma.mendixProject.findUnique({
+      where: { id: projectId }
+    })
+
+    if (!project) {
+      return NextResponse.json(
+        { error: 'Project not found' },
+        { status: 404 }
+      )
+    }
+
+    // Analyze intent and get smart replies
+    const smartReply = await intentService.analyzeIntent(message, project)
+
+    // Configure OpenAI
+    const configuration = new Configuration({
       apiKey: apiKeys.openaiKey,
     })
+    const openai = new OpenAIApi(configuration)
 
-    const { message, model } = await request.json()
+    // Include project context in the conversation
+    const systemMessage = `You are an AI assistant helping with the Mendix project "${project.name}". 
+    Project ID: ${project.id}
+    Project Description: ${project.description || 'No description available'}
+    
+    Provide assistance with development tasks, answer questions, and suggest solutions.`
 
-    // First, analyze the intent
-    const smartReply = await analyzeIntent(openai, message)
-
-    // Then, get the main response
-    const completion = await openai.chat.completions.create({
-      model: model || "gpt-3.5-turbo",
+    const completion = await openai.createChatCompletion({
+      model: model || 'gpt-3.5-turbo',
       messages: [
-        {
-          role: "system",
-          content: "You are a helpful assistant specialized in Mendix development. Help users understand their Mendix projects and provide guidance on best practices. Keep responses focused on the specific question."
-        },
-        {
-          role: "user",
-          content: message
-        }
+        { role: 'system', content: systemMessage },
+        { role: 'user', content: message }
       ],
-      temperature: 0.7,
-      max_tokens: 500,
     })
 
-    // Combine the intent analysis with the main response
-    smartReply.text = completion.choices[0].message.content
+    const response = completion.data.choices[0]?.message?.content || 'Sorry, I could not generate a response.'
 
-    // Execute any actions if needed
-    await executeActions(smartReply.actions)
+    // Record the interaction
+    await prisma.chatMessage.create({
+      data: {
+        projectId,
+        userMessage: message,
+        assistantResponse: response,
+        model,
+        intent: smartReply.actions[0]?.type || 'UNKNOWN'
+      }
+    })
 
-    return NextResponse.json({ 
-      response: smartReply.text,
-      smartReply 
+    return NextResponse.json({
+      response,
+      smartReply
     })
   } catch (error: any) {
-    console.error('Chat API Error:', error)
+    console.error('Chat API error:', error)
     return NextResponse.json(
-      { error: 'Failed to get response from OpenAI' }, 
+      { error: error.message || 'Failed to process chat request' },
       { status: 500 }
     )
   }

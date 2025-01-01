@@ -1,4 +1,3 @@
-import { ChakraProvider } from '@chakra-ui/react'
 import { Inter } from 'next/font/google'
 import Header from './components/Header'
 import { Providers } from './providers'
@@ -8,7 +7,7 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
   title: 'MX Copilot',
-  description: 'Mendix Development Assistant',
+  description: 'AI-powered assistant for Mendix development',
 }
 
 export default function RootLayout({

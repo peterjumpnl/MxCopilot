@@ -1,11 +1,23 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/app/lib/prisma'
+import { MendixPlatformService } from '@/app/services/mendix-platform-api'
+
+const platformService = new MendixPlatformService()
 
 export async function POST(request: Request) {
   try {
     const { projectId } = await request.json()
 
-    // Get API key for Mendix API calls
+    // First try to get from database
+    const existingProject = await prisma.mendixProject.findUnique({
+      where: { id: projectId }
+    })
+
+    if (existingProject) {
+      return NextResponse.json({ project: existingProject })
+    }
+
+    // Get API keys
     const apiKeys = await prisma.apiKeys.findFirst({
       orderBy: {
         createdAt: 'desc'
@@ -19,33 +31,48 @@ export async function POST(request: Request) {
       )
     }
 
-    // Call Mendix API to get project details
-    const response = await fetch(`https://api.mendix.com/projects/${projectId}`, {
-      headers: {
-        'Authorization': `MxToken ${apiKeys.pat}`,
-        'Content-Type': 'application/json',
-      },
-    })
+    let projectData
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch project details')
+    // Try Mendix REST API first
+    try {
+      const response = await fetch(`https://api.mendix.com/projects/${projectId}`, {
+        headers: {
+          'Authorization': `MxToken ${apiKeys.pat}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        projectData = await response.json()
+      }
+    } catch (error) {
+      console.log('REST API failed, trying Platform SDK...')
     }
 
-    const projectData = await response.json()
+    // If REST API fails, try Platform SDK
+    if (!projectData) {
+      try {
+        await platformService.initialize(apiKeys.pat)
+        projectData = await platformService.getProjectDetails(projectId)
+      } catch (error) {
+        console.error('Both APIs failed to fetch project:', error)
+        throw new Error('Failed to fetch project details from both APIs')
+      }
+    }
 
-    // Store or update project in database
+    // Store in database
     const project = await prisma.mendixProject.upsert({
       where: { id: projectId },
       update: {
         name: projectData.name,
-        url: projectData.url,
-        description: projectData.description,
+        url: projectData.url || '',
+        description: projectData.description || null,
       },
       create: {
         id: projectId,
         name: projectData.name,
-        url: projectData.url,
-        description: projectData.description,
+        url: projectData.url || '',
+        description: projectData.description || null,
       },
     })
 

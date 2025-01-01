@@ -67,7 +67,7 @@ export default function ProjectTabs({ projectId }: ProjectTabsProps) {
 
         <TabPanels>
           <TabPanel>
-            <ChatInterface />
+            <ChatInterface projectId={projectId} />
           </TabPanel>
           <TabPanel>
             {isLoadingModules ? (

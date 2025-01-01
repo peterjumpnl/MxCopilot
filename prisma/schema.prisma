@@ -37,3 +37,16 @@ model AccessedProject {
 
   @@map("accessed_projects")
 }
+
+model ChatMessage {
+  id                String   @id @default(uuid())
+  projectId         String
+  userMessage      String
+  assistantResponse String
+  model            String
+  intent           String
+  createdAt        DateTime @default(now())
+
+  @@index([projectId])
+  @@map("chat_messages")
+}

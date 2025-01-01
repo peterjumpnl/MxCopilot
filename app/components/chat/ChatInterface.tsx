@@ -36,13 +36,17 @@ interface Feedback {
   type: 'info' | 'warning' | 'error' | 'success'
 }
 
+interface ChatInterfaceProps {
+  projectId: string
+}
+
 const AVAILABLE_MODELS = [
   { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', description: 'Good balance of speed and capability' },
   { id: 'gpt-4', name: 'GPT-4', description: 'Most capable model, but slower and more expensive' },
   { id: 'gpt-4-turbo-preview', name: 'GPT-4 Turbo', description: 'Latest GPT-4 model with improved capabilities' },
 ]
 
-export default function ChatInterface() {
+export default function ChatInterface({ projectId }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputMessage, setInputMessage] = useState('')
   const [feedback, setFeedback] = useState<Feedback[]>([])
@@ -95,7 +99,8 @@ export default function ChatInterface() {
         },
         body: JSON.stringify({ 
           message: inputMessage,
-          model: selectedModel
+          model: selectedModel,
+          projectId
         }),
       })
 

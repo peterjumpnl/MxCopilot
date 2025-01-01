@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Box,
   Container,
@@ -31,6 +32,7 @@ export default function Home() {
   const [projects, setProjects] = useState<MendixProject[]>([])
   const [isSyncing, setIsSyncing] = useState(false)
   const toast = useToast()
+  const router = useRouter()
 
   useEffect(() => {
     checkStoredKeys()
@@ -227,8 +229,8 @@ export default function Home() {
         }),
       })
 
-      // Switch to project page immediately
-      setStep('modules')
+      // Navigate to the chat page with project ID
+      router.push(`/chat/${projectId}`)
     } catch (error) {
       console.error('Error opening project:', error)
       toast({
