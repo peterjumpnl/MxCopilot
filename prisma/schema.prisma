@@ -1,0 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model ApiKeys {
+  id        Int      @id @default(autoincrement())
+  pat       String
+  openaiKey String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Project {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MendixProject {
+  id          String   @id
+  name        String
+  url         String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AccessedProject {
+  id          String   @id
+  name        String?
+  accessedAt  DateTime @default(now())
+
+  @@map("accessed_projects")
+}
